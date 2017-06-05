@@ -64,19 +64,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\NCore\BinaryStructure.cs">
+    <Compile Include="..\..\NFirmwareEditor-7.1\src\NCore\BinaryStructure.cs">
       <Link>BinaryStructure.cs</Link>
     </Compile>
-    <Compile Include="..\NCore\USB\HidConnector.cs">
+    <Compile Include="..\..\NFirmwareEditor-7.1\src\NCore\USB\HidConnector.cs">
       <Link>HidConnector.cs</Link>
     </Compile>
-    <Compile Include="..\NCore\USB\HidDeviceInfo.cs">
+    <Compile Include="..\..\NFirmwareEditor-7.1\src\NCore\USB\HidDeviceInfo.cs">
       <Link>HidDeviceInfo.cs</Link>
     </Compile>
-    <Compile Include="..\NToolbox\Models\ArcticFoxConfiguration.cs">
+    <Compile Include="..\..\NFirmwareEditor-7.1\src\NToolbox\Models\ArcticFoxConfiguration.cs">
       <Link>ArcticFoxConfiguration.cs</Link>
     </Compile>
-    <Compile Include="..\NToolbox\Models\MonitoringData.cs">
+    <Compile Include="..\..\NFirmwareEditor-7.1\src\NToolbox\Models\MonitoringData.cs">
       <Link>MonitoringData.cs</Link>
     </Compile>
     <Compile Include="HidSharp\HidDeviceLoader.cs" />
@@ -89,7 +89,6 @@
     <Compile Include="Trace.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="GettingStarted.Xamarin" />
     <None Include="Resources\AboutResources.txt" />
   </ItemGroup>
   <ItemGroup>
