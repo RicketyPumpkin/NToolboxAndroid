@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Android.App;
 using Android.Content;
 
@@ -267,7 +267,8 @@ namespace NToolboxAndroid
             }
             catch (Exception ex)
             {
-                Toast.MakeText(this, ex.ToString(), ToastLength.Long);
+                NCore.Trace.Warn("CheckData exception", ex.ToString());
+                Toast.MakeText(this, ex.ToString(), ToastLength.Long).Show();
                 return false;
             }
             return true;
@@ -310,14 +311,28 @@ namespace NToolboxAndroid
                 {
                     lock (locker)
                     {
-
                         var cdata = HidConnector.Instance.ReadConfiguration();
+                        
+                        // Validate data before deserialization
+                        if (cdata == null || cdata.Length == 0)
+                        {
+                            NCore.Trace.Warn("ReadConfiguration returned null or empty data");
+                            _deviceConfiguration = null;
+                            return;
+                        }
+                        
                         _deviceConfiguration = BinaryStructure.ReadBinary<ArcticFoxConfiguration>(cdata);
+                        
+                        if (_deviceConfiguration == null)
+                        {
+                            NCore.Trace.Warn("ReadBinary returned null configuration");
+                        }
                     }
                 }
                 catch (Exception e)
                 {
-                    // Toast.MakeText(this, $"Unable to read configuration. {e.ToString()}", ToastLength.Long).Show();
+                    NCore.Trace.Warn("DownloadProfile exception", $"Unable to read configuration. {e.ToString()}");
+                    _deviceConfiguration = null;
                 }
 
 
@@ -334,7 +349,16 @@ namespace NToolboxAndroid
                         //m_deviceConfiguration.Advanced.CustomBatteryProfiles[(byte)selectedBattery - 1];
                         //_deviceConfiguration.Advanced.CustomBatteryProfiles[0].Cutoff
 
-                        LoadBaseData();
+                        try
+                        {
+                            LoadBaseData();
+                        }
+                        catch (Exception ex)
+                        {
+                            NCore.Trace.Warn("LoadBaseData exception", ex.ToString());
+                            Toast.MakeText(this, $"Failed to load device data: {ex.Message}", ToastLength.Long).Show();
+                            return;
+                        }
 
                         var selectedProfile = _deviceConfiguration.General.Profiles[_deviceConfiguration.General.SelectedProfile];
 
@@ -375,9 +399,10 @@ namespace NToolboxAndroid
 
 
 
-
-
-
+                    }
+                    else
+                    {
+                        Toast.MakeText(this, "Failed to read device configuration", ToastLength.Long).Show();
                     }
                 });
 
@@ -468,6 +493,7 @@ namespace NToolboxAndroid
             }
             catch (Exception e)
             {
+                NCore.Trace.Warn("CheckSetData exception", e.ToString());
                 return e.ToString();
             }
             return "";
@@ -477,12 +503,40 @@ namespace NToolboxAndroid
 
         private void LoadBaseData()
         {
-            deviceName.Text = HidDeviceInfo.Get(_deviceConfiguration.Info.ProductId).Name + ":";
-
-            adapterSpinnerPreheatCurve.Clear();
-            foreach (var curve in _deviceConfiguration.Advanced.PowerCurves)
+            // Validate configuration and Info object
+            if (_deviceConfiguration?.Info == null)
             {
-                adapterSpinnerPreheatCurve.Add(curve.Name);
+                throw new InvalidOperationException("Device configuration or info is null");
+            }
+
+            var deviceInfo = HidDeviceInfo.Get(_deviceConfiguration.Info.ProductId);
+            if (deviceInfo == null)
+            {
+                NCore.Trace.Warn($"Device not recognized for ProductId: {_deviceConfiguration.Info.ProductId}");
+                throw new InvalidOperationException($"Unknown device ProductId: {_deviceConfiguration.Info.ProductId}");
+            }
+
+            deviceName.Text = deviceInfo.Name + ":";
+
+            // Validate PowerCurves collection
+            if (_deviceConfiguration?.Advanced?.PowerCurves != null)
+            {
+                adapterSpinnerPreheatCurve.Clear();
+                foreach (var curve in _deviceConfiguration.Advanced.PowerCurves)
+                {
+                    adapterSpinnerPreheatCurve.Add(curve.Name);
+                }
+            }
+            else
+            {
+                NCore.Trace.Warn("PowerCurves is null");
+            }
+
+            // Validate TFRTables collection
+            if (_deviceConfiguration?.Advanced?.TFRTables == null)
+            {
+                NCore.Trace.Warn("TFRTables is null");
+                throw new InvalidOperationException("TFRTables configuration is null");
             }
 
             adapterSpinnerMaterial.Clear();
@@ -494,7 +548,15 @@ namespace NToolboxAndroid
                 }
                 else
                 {
-                    adapterSpinnerMaterial.Add($"[TFR]{_deviceConfiguration.Advanced.TFRTables[i - 5].Name}");
+                    int tfrIndex = i - 5;
+                    if (tfrIndex < _deviceConfiguration.Advanced.TFRTables.Length)
+                    {
+                        adapterSpinnerMaterial.Add($"[TFR]{_deviceConfiguration.Advanced.TFRTables[tfrIndex].Name}");
+                    }
+                    else
+                    {
+                        NCore.Trace.Warn($"TFRTable index {tfrIndex} out of bounds");
+                    }
                 }
             }
         }
@@ -545,18 +607,6 @@ namespace NToolboxAndroid
             // throw new NotImplementedException();
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
         public void OnClick(View v)
         {
             if (v.Id == uploadButton.Id)
@@ -586,6 +636,11 @@ namespace NToolboxAndroid
                                 {
                                     NCore.Trace.Warn("Unable to write configuration.");
                                     Toast.MakeText(this, "Unable to write configuration.", ToastLength.Long).Show();
+                                }
+                                catch (Exception ex)
+                                {
+                                    NCore.Trace.Warn("WriteConfiguration exception", ex.ToString());
+                                    Toast.MakeText(this, $"Error writing configuration: {ex.Message}", ToastLength.Long).Show();
                                 }
                             });
                             builder.SetNegativeButton("Cancel", (s, e) => { Toast.MakeText(this, "canceled.", ToastLength.Long).Show(); });
@@ -640,20 +695,39 @@ namespace NToolboxAndroid
                 lock (locker)
                 {
                     var mdata = HidConnector.Instance.ReadMonitoringData();
+                    
+                    if (mdata == null || mdata.Length == 0)
+                    {
+                        NCore.Trace.Warn("ReadMonitoringData returned null or empty data");
+                        return;
+                    }
+                    
                     monitordata = BinaryStructure.ReadBinary<MonitoringData>(mdata);
-                    HidConnector.Instance.ReadMonitoringData();
+                    
+                    if (monitordata != null)
+                    {
+                        HidConnector.Instance.ReadMonitoringData();
+                    }
                 }
             }
             catch (Exception e)
             {
-                //Toast.MakeText(this, $"Unable to read monitordata. {e.ToString()}", ToastLength.Long).Show();
+                NCore.Trace.Warn("GetRealtimeData exception", $"Unable to read monitordata. {e.ToString()}");
             }
+            
             if (monitordata != null)
             {
                 RunOnUiThread(() =>
                 {
-                    var realResistance = monitordata.RealResistance / 1000f;
-                    resistanceTxt.Text = $"Resistance ({realResistance})";
+                    try
+                    {
+                        var realResistance = monitordata.RealResistance / 1000f;
+                        resistanceTxt.Text = $"Resistance ({realResistance})";
+                    }
+                    catch (Exception ex)
+                    {
+                        NCore.Trace.Warn("GetRealtimeData UI update exception", ex.ToString());
+                    }
                 });
 
 
@@ -682,4 +756,3 @@ namespace NToolboxAndroid
 
     }
 }
-
